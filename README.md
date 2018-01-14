@@ -16,3 +16,5 @@ I will hopefully add proper code documentation. Most of this was written entirel
 Also proper exception handling would be nice I guess.
 
 I could also make the whole communication framework bidirectional, in order to react to events that occur on the EV3 block's side, such as button presses or exceptions. 
+
+As of now, the EV3ServerController and the EV3Controller's methods in general are trimmed to our specific EV3 block setup, I may or may not make a more generic version that allows any configuration to work.
