@@ -1,23 +1,26 @@
 package de.thkoeln.mindstorms.bots;
 
-import de.thkoeln.mindstorms.client.MindstormsBot;
+import de.thkoeln.mindstorms.client.environment.Disabled;
+import de.thkoeln.mindstorms.client.environment.MindstormsBot;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 
 /**
  * DummyBot
  */
-@MindstormsBot
-public class DummyBot implements Runnable {
-    private final EV3Controller controller;
+@Disabled
+public class DummyBot extends MindstormsBot {
+    private boolean travelling = true;
 
-    public DummyBot(EV3Controller controller) {
-        this.controller = controller;
+    public DummyBot(EV3Controller ctr) {
+        super(ctr);
     }
 
     @Override
-    public void run() {
-        controller.travel(30.0).onComplete(result ->
-                controller.drawString("We just moved", 0, 0)
-        );
+    public void run() throws Exception {
+        ctr.rotateFrontDistanceSensorMotor(90);
+        while (true) {
+            System.out.println(ctr.readFrontDistanceSensor().get());
+            Thread.sleep(1000);
+        }
     }
 }
