@@ -1,17 +1,16 @@
 package de.thkoeln.mindstorms.server.controlling;
 
 import de.thkoeln.mindstorms.concurrency.ObservableRequest;
+import de.thkoeln.mindstorms.server.controlling.operation.Opcode;
 import de.thkoeln.mindstorms.server.ev3.MovePilotFactory;
 import lejos.hardware.ev3.EV3;
 import lejos.hardware.ev3.LocalEV3;
 import lejos.hardware.lcd.LCD;
 import lejos.hardware.motor.Motor;
 import lejos.hardware.motor.NXTRegulatedMotor;
-import lejos.hardware.port.Port;
 import lejos.hardware.sensor.EV3ColorSensor;
 import lejos.hardware.sensor.EV3UltrasonicSensor;
 import lejos.hardware.sensor.SensorMode;
-import lejos.hardware.sensor.SensorModes;
 import lejos.robotics.SampleProvider;
 import lejos.robotics.filter.MeanFilter;
 import lejos.robotics.navigation.MovePilot;
@@ -22,19 +21,17 @@ import lejos.robotics.navigation.MovePilot;
 public class EV3ServerController implements EV3Controller {
     private final MovePilot movePilot;
     private final NXTRegulatedMotor frontDistanceSensorMotor;
-    private final SensorMode backDistanceSensor;
     private final SensorMode frontDistanceSensor;
     private final SensorMode colorSensor;
-    private double surfaceBias = 1.5;
+    private double surfaceBias = 0.75;
 
     public EV3ServerController() {
         movePilot = MovePilotFactory.createMovePilot();
         EV3 ev3 = LocalEV3.get();
 
         frontDistanceSensorMotor = Motor.C;
-        frontDistanceSensor = new EV3UltrasonicSensor(ev3.getPort("S4")).getMode("Distance");
-        backDistanceSensor = new EV3UltrasonicSensor(ev3.getPort("S2")).getMode("Distance");
-        colorSensor = new EV3ColorSensor(ev3.getPort("S3")).getColorIDMode();
+        frontDistanceSensor = new EV3UltrasonicSensor(ev3.getPort("S2")).getMode("Distance");
+        colorSensor = new EV3ColorSensor(ev3.getPort("S3")).getRGBMode();
     }
 
     @Override
@@ -45,7 +42,7 @@ public class EV3ServerController implements EV3Controller {
 
     @Override
     public ObservableRequest<Void> rotate(double angle) {
-        movePilot.rotate(angle / surfaceBias);
+        movePilot.rotate(angle * surfaceBias);
         return new ObservableRequest<>();
     }
 
@@ -87,15 +84,25 @@ public class EV3ServerController implements EV3Controller {
     }
 
     @Override
-    public ObservableRequest<Float> readBackDistanceSensor() {
-        MeanFilter meanFilter = new MeanFilter(backDistanceSensor, 5);
-        float distance = readSamples(meanFilter)[0];
-        return new ObservableRequest<>(distance);
+    public ObservableRequest<Void> rotateFrontDistanceSensorMotor(int angle) {
+        frontDistanceSensorMotor.rotate(angle);
+        return new ObservableRequest<>();
     }
 
     @Override
-    public ObservableRequest<Void> rotateFrontDistanceSensorMotor(int angle) {
-        frontDistanceSensorMotor.rotate(angle);
+    public ObservableRequest<Float> getSensorPosition() {
+        return new ObservableRequest<>(frontDistanceSensorMotor.getPosition());
+    }
+
+    @Override
+    public ObservableRequest<Void> setLinearAcceleration(double acceleration) {
+        movePilot.setLinearAcceleration(acceleration);
+        return new ObservableRequest<>();
+    }
+
+    @Override
+    public ObservableRequest<Void> setAngularAcceleration(double acceleration) {
+        movePilot.setAngularAcceleration(acceleration);
         return new ObservableRequest<>();
     }
 

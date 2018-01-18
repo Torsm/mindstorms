@@ -4,6 +4,7 @@ import de.thkoeln.mindstorms.server.controlling.EV3ServerController;
 import de.thkoeln.mindstorms.server.controlling.operation.OpcodeResolver;
 import de.thkoeln.mindstorms.server.messaging.RequestReceiverService;
 import de.thkoeln.mindstorms.server.messaging.ResponderService;
+import lejos.hardware.lcd.LCD;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -26,6 +27,7 @@ public class MindstormsServer {
 
 		while (true) {
 			try {
+				LCD.drawString("Accepting socket...", 0, 1);
 				Socket socket = serverSocket.accept();
 
 				ResponderService responderService = new ResponderService(socket.getOutputStream(), controller);

@@ -1,6 +1,7 @@
 package de.thkoeln.mindstorms.server.messaging;
 
 import de.thkoeln.mindstorms.server.controlling.operation.OpcodeResolver;
+import lejos.hardware.lcd.LCD;
 
 import java.io.DataInputStream;
 import java.io.IOException;
