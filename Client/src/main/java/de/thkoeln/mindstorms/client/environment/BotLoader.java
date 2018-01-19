@@ -1,5 +1,7 @@
 package de.thkoeln.mindstorms.client.environment;
 
+import de.thkoeln.mindstorms.client.environment.properties.Disabled;
+import de.thkoeln.mindstorms.client.environment.properties.Priority;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 import org.reflections.Reflections;
 

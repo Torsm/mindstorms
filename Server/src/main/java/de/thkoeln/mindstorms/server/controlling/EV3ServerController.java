@@ -24,6 +24,7 @@ public class EV3ServerController implements EV3Controller {
     private final SensorMode frontDistanceSensor;
     private final SensorMode colorSensor;
     private double surfaceBias = 0.75;
+    private int direction = 1;
 
     public EV3ServerController() {
         movePilot = MovePilotFactory.createMovePilot();
@@ -104,6 +105,17 @@ public class EV3ServerController implements EV3Controller {
     public ObservableRequest<Void> setAngularAcceleration(double acceleration) {
         movePilot.setAngularAcceleration(acceleration);
         return new ObservableRequest<>();
+    }
+
+    @Override
+    public ObservableRequest<Void> setDirection(int direction) {
+        this.direction = direction;
+        return new ObservableRequest<>();
+    }
+
+    @Override
+    public ObservableRequest<Integer> getDirection() {
+        return new ObservableRequest<>(direction);
     }
 
     private float[] readSamples(SampleProvider sensor) {

@@ -42,4 +42,10 @@ public interface EV3Controller {
 
     @Opcode(11)
     ObservableRequest<Void> setAngularAcceleration(double acceleration);
+
+    @Opcode(12)
+    ObservableRequest<Void> setDirection(int direction);
+
+    @Opcode(13)
+    ObservableRequest<Integer> getDirection();
 }

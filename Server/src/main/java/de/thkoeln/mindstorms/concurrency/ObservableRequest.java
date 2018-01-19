@@ -54,6 +54,14 @@ public class ObservableRequest<T> implements Future<T> {
         throw new TimeoutException();
     }
 
+    public T await() {
+        try {
+            return get();
+        } catch (InterruptedException e) {
+            return null;
+        }
+    }
+
     public Method getMethod() {
         return method;
     }

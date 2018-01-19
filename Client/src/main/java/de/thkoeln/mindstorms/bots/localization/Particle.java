@@ -6,12 +6,12 @@ import java.awt.*;
  * Particle
  */
 public class Particle {
-    private double x, y, believe, angle;
+    private double x, y, belief, angle;
 
-    public Particle(double x, double y, double believe) {
+    public Particle(double x, double y, double belief) {
         this.x = x;
         this.y = y;
-        this.believe = believe;
+        this.belief = belief;
     }
 
     public double getX() {
@@ -26,12 +26,16 @@ public class Particle {
         return y;
     }
 
-    public double getBelieve() {
-        return believe;
+    public double getBelief() {
+        return belief;
     }
 
-    public void adjustBelieve(double factor) {
-        believe *= factor;
+    public void adjustBelief(double factor) {
+        belief *= factor;
+    }
+
+    public void setBelief(double belief) {
+        this.belief = belief;
     }
 
     public double getAngle() {

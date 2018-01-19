@@ -1,6 +1,6 @@
 package de.thkoeln.mindstorms.bots;
 
-import de.thkoeln.mindstorms.client.environment.Disabled;
+import de.thkoeln.mindstorms.client.environment.properties.Disabled;
 import de.thkoeln.mindstorms.client.environment.MindstormsBot;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 

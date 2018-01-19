@@ -1,4 +1,4 @@
-package de.thkoeln.mindstorms.client.environment;
+package de.thkoeln.mindstorms.client.environment.properties;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
