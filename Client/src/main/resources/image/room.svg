@@ -1,0 +1,16 @@
+<?xml version="1.0" standalone="yes"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="150.0" height="200.0" style="zoom: 1;">
+<g>
+<line stroke="#000000" x1="0.0" x2="150.0" y1="0.0" y2="0.0"></line>
+<line stroke="#000000" x1="150.0" x2="150.0" y1="0.0" y2="150.0"></line>
+<line stroke="#000000" x1="150.0" x2="100.0" y1="150.0" y2="150.0"></line>
+<line stroke="#000000" x1="100.0" x2="100.0" y1="150.0" y2="200.0"></line>
+<line stroke="#000000" x1="100.0" x2="0.0" y1="200.0" y2="200.0"></line>
+<line stroke="#000000" x1="0.0" x2="0.0" y1="200.0" y2="0.0"></line>
+<line stroke="#000000" x1="0.0" x2="50.0" y1="100.0" y2="100.0"></line>
+<line stroke="#000000" x1="50.0" x2="50.0" y1="50.0" y2="0.0"></line>
+<line stroke="#000000" x1="150.0" x2="100.0" y1="50.0" y2="50.0"></line>
+<line stroke="#000000" x1="0.0" x2="50.0" y1="150.0" y2="150.0"></line>
+<line stroke="#000000" x1="100.0" x2="100.0" y1="50.0" y2="100.0"></line>
+</g>
+</svg>

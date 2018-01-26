@@ -6,8 +6,6 @@ import de.thkoeln.mindstorms.client.proxy.EV3ControllerProxyFactory;
 import de.thkoeln.mindstorms.server.MindstormsServer;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 
-import java.util.Scanner;
-
 /**
  * Boot
  */

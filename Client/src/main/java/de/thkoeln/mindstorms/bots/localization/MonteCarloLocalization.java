@@ -1,20 +1,25 @@
 package de.thkoeln.mindstorms.bots.localization;
 
+import de.thkoeln.mindstorms.concurrency.ObservableRequest;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
+import de.thkoeln.mindstorms.util.LloydsAlgorithm;
 
+import java.lang.reflect.Method;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * MonteCarloLocalization
  */
+
+
+//TODO Partikel müssen zufällig eine richtung haben, vorne oder hinten da der bot später auch zufällig zu einer seite guckt (?)
 public class MonteCarloLocalization implements Runnable {
-    public final static int CAPACITY = 1000;
+    private final static int CAPACITY = 1000;
+    private final static int WIDTH = 400;
     private final static double TRAVEL_DISTANCE = 5;
 
     private final EV3Controller ctr;
@@ -34,7 +39,7 @@ public class MonteCarloLocalization implements Runnable {
 
     public void start(double y) {
         final double belief = 1 / (double) MonteCarloLocalization.CAPACITY;
-        particles = IntStream.range(0, CAPACITY).mapToObj(i -> new Particle(400 * Math.random(), y, belief)).collect(Collectors.toList());
+        particles = IntStream.range(0, CAPACITY).mapToObj(i -> new Particle(WIDTH * Math.random(), y, belief)).collect(Collectors.toList());
         direction = ctr.getDirection().await();
         ctr.rotateFrontDistanceSensorMotor(90 - direction * ctr.getSensorPosition().await().intValue());
         ctr.clearScreen();
@@ -48,23 +53,36 @@ public class MonteCarloLocalization implements Runnable {
 
     @Override
     public void run() {
+        try {
+            loop();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void loop() throws InterruptedException {
         ctr.travel(TRAVEL_DISTANCE * 10).await();
         if (correct()) {
+            final ObservableRequest<double[][]> clusterRequest = new ObservableRequest<>((Method) null);
             ctr.readFrontDistanceSensor().onComplete(result -> {
-                double dist = result.doubleValue() > 50 ? 70 : 20;
+                double dist = result.doubleValue() > 0.5 ? 70 : 20;
 
                 final double sum = particles.parallelStream()
                         .peek(particle -> {
                             particle.adjustX(TRAVEL_DISTANCE * direction);
 
                             Map.Entry<Double, Double> entry = particleDistanceMap.floorEntry(particle.getX());
-                            double particleDist = particle.getY() - (entry == null ? 70 : entry.getValue());
+                            double particleDist = particle.getY() - (entry == null ? 0 : entry.getValue());
                             double val = Math.min(dist, particleDist) / Math.max(dist, particleDist);
 
                             particle.adjustBelief(val);
                         })
                         .mapToDouble(Particle::getBelief)
                         .sum();
+
+                double[][] positions = particles.stream().map(particle -> new double[]{particle.getX(), particle.getY(), 0.0}).collect(Collectors.toList()).toArray(new double[0][0]);
+                LloydsAlgorithm lloydsAlgorithm = new LloydsAlgorithm(positions);
+                clusterRequest.complete(lloydsAlgorithm.getClusterPoints(2));
 
                 particles.parallelStream().forEach(particle -> particle.adjustBelief(1/sum));
 
@@ -73,13 +91,25 @@ public class MonteCarloLocalization implements Runnable {
                 final double sum2 = particles.parallelStream().mapToDouble(Particle::getBelief).sum();
                 particles.parallelStream().forEach(particle -> particle.adjustBelief(1/sum2));
                 listener.onNewGeneration(particles);
-            }).await();
+            });
+
+            double[][] clusters = clusterRequest.get();
+            if (clusters.length == 2) {
+                double x1 = clusters[0][0];
+                double x2 = clusters[1][0];
+                if (Math.abs(x1 - x2) < 15) {
+                    stop();
+                    ctr.drawString("AYY", 0, 0);
+                }
+            }
         }
     }
 
     private double mutate(double val) {
-        double mutation = 0.1;
-        return val + val * ((Math.random() * mutation) - mutation/2.0);
+        if (ThreadLocalRandom.current().nextDouble() > 0.1)
+            return val;
+        double mutation = 5;
+        return ThreadLocalRandom.current().nextDouble(val - mutation, val + mutation);
     }
 
     private boolean correct() {
@@ -103,10 +133,10 @@ public class MonteCarloLocalization implements Runnable {
                         e.printStackTrace();
                     }
                 } else {
-                    ctr.rotate(-98).await();
+                    ctr.rotate(-95).await();
                 }
             } else {
-                ctr.rotate(-82).await();
+                ctr.rotate(-85).await();
             }
         }
         return b;
@@ -121,7 +151,7 @@ public class MonteCarloLocalization implements Runnable {
             double indP = 1.0 / (double) particles.size() * (sp - (2.0 * sp - 2.0) * (double) (pos - 1) / (double)(particles.size() - 1));
             if (Math.random() < indP) {
                 Particle particle = particles.get(pos);
-                newGen.add(new Particle(mutate(particle.getX()), particle.getY(), particle.getBelief()));
+                newGen.add(new Particle(mutate(particle.getX()), particle.getY(), 1 / (double) CAPACITY));
                 pos = -1;
             }
             if (pos < particles.size()) {

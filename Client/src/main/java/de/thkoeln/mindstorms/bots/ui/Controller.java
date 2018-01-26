@@ -3,6 +3,7 @@ package de.thkoeln.mindstorms.bots.ui;
 import de.thkoeln.mindstorms.bots.UserControlledBot;
 import de.thkoeln.mindstorms.bots.localization.MonteCarloLocalization;
 import de.thkoeln.mindstorms.bots.localization.Particle;
+import de.thkoeln.mindstorms.client.MindstormsClient;
 import de.thkoeln.mindstorms.client.environment.properties.Disabled;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 import javafx.application.Platform;
@@ -19,6 +20,7 @@ import javax.xml.stream.XMLStreamException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.*;
@@ -29,39 +31,14 @@ import java.util.stream.IntStream;
  * Controller
  */
 @Disabled
-public class Controller implements Initializable, MonteCarloLocalization.ParticleListener {
-    public Button chooseFileButton;
+public class Controller implements MonteCarloLocalization.ParticleListener {
     public Canvas canvas;
-    public Button two;
 
     private EV3Controller ctr;
     private List<Line> lines;
     private TreeMap<Double, Double> map;
+
     private MonteCarloLocalization monteCarloLocalization;
-
-
-    @Override
-    public void initialize(URL location, ResourceBundle resources) {
-
-    }
-
-    public void chooseFile() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Open Resource File");
-        fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Image Files", "*.svg"));
-        File selectedFile = fileChooser.showOpenDialog(null);
-        if (selectedFile != null) {
-            try {
-                lines = Arrays.asList(new SVGMapLoader(new FileInputStream(selectedFile)).readLineMap().flip().getLines());
-                map = new TreeMap<>();
-                lines.stream().filter(line -> line.y1 == line.y2).forEach(line -> map.put((double) line.x1, (double) line.y1));
-
-                draw();
-            } catch (FileNotFoundException | XMLStreamException e) {
-                e.printStackTrace();
-            }
-        }
-    }
 
     private void draw() {
         final GraphicsContext graphics = canvas.getGraphicsContext2D();
@@ -73,11 +50,31 @@ public class Controller implements Initializable, MonteCarloLocalization.Particl
     }
 
     public void runTwo() {
+        loadMap("/image/street.svg");
+
         if (monteCarloLocalization != null)
             monteCarloLocalization.stop();
 
         monteCarloLocalization = new MonteCarloLocalization(ctr, this, map);
         monteCarloLocalization.start(lines.get(lines.size()-1).y1);
+    }
+
+    public void runThree() {
+        loadMap("/image/room.svg");
+
+
+    }
+
+    private void loadMap(String resource) {
+        try {
+            InputStream stream = MindstormsClient.class.getResourceAsStream(resource);
+            lines = Arrays.asList(new SVGMapLoader(stream).readLineMap().flip().getLines());
+            map = new TreeMap<>(lines.stream().filter(line -> line.y1 == line.y2 && line.y1 != 70).collect(Collectors.toMap(Line::getX1, Line::getY1)));
+
+            draw();
+        } catch (XMLStreamException e) {
+            e.printStackTrace();
+        }
     }
 
     public void setController(int id) {
