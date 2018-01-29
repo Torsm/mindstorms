@@ -1,77 +1,73 @@
 package de.thkoeln.mindstorms.bots.ui;
 
 import de.thkoeln.mindstorms.bots.UserControlledBot;
-import de.thkoeln.mindstorms.bots.localization.MonteCarloLocalization;
-import de.thkoeln.mindstorms.bots.localization.Particle;
+import de.thkoeln.mindstorms.bots.localization.*;
 import de.thkoeln.mindstorms.client.MindstormsClient;
-import de.thkoeln.mindstorms.client.environment.properties.Disabled;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 import javafx.application.Platform;
-import javafx.fxml.Initializable;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Button;
 import javafx.scene.paint.Color;
-import javafx.stage.FileChooser;
 import lejos.robotics.geometry.Line;
 import lejos.robotics.mapping.SVGMapLoader;
 
 import javax.xml.stream.XMLStreamException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.InputStream;
-import java.net.URL;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Controller
  */
-@Disabled
-public class Controller implements MonteCarloLocalization.ParticleListener {
+public class Controller implements ParticleListener {
+    public static final double SCALE = 1;
     public Canvas canvas;
 
     private EV3Controller ctr;
     private List<Line> lines;
-    private TreeMap<Double, Double> map;
 
-    private MonteCarloLocalization monteCarloLocalization;
+    private LocalizationService service;
 
-    private void draw() {
+    private void drawMap() {
         final GraphicsContext graphics = canvas.getGraphicsContext2D();
         graphics.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-        graphics.setFill(Color.BLACK);
+        graphics.setLineWidth(1);
+        graphics.setStroke(Color.BLACK);
         if (lines != null) {
-            lines.forEach(line -> graphics.strokeLine(line.x1 * 2, line.y1 * 2, line.x2 * 2, line.y2 * 2));
+            lines.forEach(line -> graphics.strokeLine(line.x1 * SCALE, line.y1 * SCALE, line.x2 * SCALE, line.y2 * SCALE));
         }
     }
 
     public void runTwo() {
         loadMap("/image/street.svg");
+        TreeMap<Double, Double> map = new TreeMap<>(lines.stream().filter(line -> line.y1 == line.y2 && line.y1 != 70).collect(Collectors.toMap(Line::getX1, Line::getY1)));
 
-        if (monteCarloLocalization != null)
-            monteCarloLocalization.stop();
+        if (service != null)
+            service.stop();
 
-        monteCarloLocalization = new MonteCarloLocalization(ctr, this, map);
-        monteCarloLocalization.start(lines.get(lines.size()-1).y1);
+        MonteCarloLocalization1D monteCarloLocalization1D = new MonteCarloLocalization1D(ctr, this, map);
+        this.service = monteCarloLocalization1D;
+        monteCarloLocalization1D.start(lines.get(lines.size()-1).y1);
     }
 
     public void runThree() {
         loadMap("/image/room.svg");
 
 
+        if (service != null)
+            service.stop();
+
+        MonteCarloLocalization2D monteCarloLocalization2D = new MonteCarloLocalization2D(ctr, this, lines);
+        this.service = monteCarloLocalization2D;
+        monteCarloLocalization2D.start();
     }
 
     private void loadMap(String resource) {
         try {
             InputStream stream = MindstormsClient.class.getResourceAsStream(resource);
             lines = Arrays.asList(new SVGMapLoader(stream).readLineMap().flip().getLines());
-            map = new TreeMap<>(lines.stream().filter(line -> line.y1 == line.y2 && line.y1 != 70).collect(Collectors.toMap(Line::getX1, Line::getY1)));
 
-            draw();
+            drawMap();
         } catch (XMLStreamException e) {
             e.printStackTrace();
         }
@@ -82,12 +78,11 @@ public class Controller implements MonteCarloLocalization.ParticleListener {
     }
 
     @Override
-    public void onNewGeneration(List<Particle> particles) {
+    public void redraw(List<Particle> particles) {
         Platform.runLater(() -> {
-            draw();
+            drawMap();
             final GraphicsContext graphics = canvas.getGraphicsContext2D();
-            graphics.setFill(Color.RED);
-            particles.forEach(particle -> graphics.fillOval(particle.getX() * 2, particle.getY() * 2 - 1, 3, 3));
+            particles.forEach(particle -> particle.draw(graphics));
         });
     }
 }

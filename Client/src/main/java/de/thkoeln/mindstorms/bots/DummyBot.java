@@ -9,7 +9,6 @@ import de.thkoeln.mindstorms.server.controlling.EV3Controller;
  */
 @Disabled
 public class DummyBot extends MindstormsBot {
-    private boolean travelling = true;
 
     public DummyBot(EV3Controller ctr) {
         super(ctr);
@@ -17,10 +16,14 @@ public class DummyBot extends MindstormsBot {
 
     @Override
     public void run() throws Exception {
-        ctr.rotateFrontDistanceSensorMotor(90);
-        while (true) {
-            System.out.println(ctr.readFrontDistanceSensor().get());
-            Thread.sleep(1000);
+        for (int i = 0; i < 8; i++) {
+            ctr.rotate(90).await();
         }
+
+        System.exit(0);
+    }
+
+    public void read() {
+
     }
 }

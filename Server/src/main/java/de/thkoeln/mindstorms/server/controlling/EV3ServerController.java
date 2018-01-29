@@ -22,8 +22,9 @@ public class EV3ServerController implements EV3Controller {
     private final MovePilot movePilot;
     private final NXTRegulatedMotor frontDistanceSensorMotor;
     private final SensorMode frontDistanceSensor;
+    private final SensorMode backDistanceSensor;
     private final SensorMode colorSensor;
-    private double surfaceBias = 0.75;
+    private double surfaceBias = 0.7;
     private int direction = 1;
 
     public EV3ServerController() {
@@ -32,6 +33,7 @@ public class EV3ServerController implements EV3Controller {
 
         frontDistanceSensorMotor = Motor.C;
         frontDistanceSensor = new EV3UltrasonicSensor(ev3.getPort("S2")).getMode("Distance");
+        backDistanceSensor = new EV3UltrasonicSensor(ev3.getPort("S4")).getMode("Distance");
         colorSensor = new EV3ColorSensor(ev3.getPort("S3")).getRGBMode();
     }
 
@@ -80,6 +82,13 @@ public class EV3ServerController implements EV3Controller {
     @Override
     public ObservableRequest<Float> readFrontDistanceSensor() {
         MeanFilter meanFilter = new MeanFilter(frontDistanceSensor, 5);
+        float distance = readSamples(meanFilter)[0];
+        return new ObservableRequest<>(distance);
+    }
+
+    @Override
+    public ObservableRequest<Float> readBackDistanceSensor() {
+        MeanFilter meanFilter = new MeanFilter(backDistanceSensor, 5);
         float distance = readSamples(meanFilter)[0];
         return new ObservableRequest<>(distance);
     }

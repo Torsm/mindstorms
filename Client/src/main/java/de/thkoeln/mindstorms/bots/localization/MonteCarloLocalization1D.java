@@ -9,15 +9,14 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 /**
- * MonteCarloLocalization
+ * MonteCarloLocalization1D
  */
 
 
 //TODO Partikel müssen zufällig eine richtung haben, vorne oder hinten da der bot später auch zufällig zu einer seite guckt (?)
-public class MonteCarloLocalization implements Runnable {
+public class MonteCarloLocalization1D implements Runnable, LocalizationService {
     private final static int CAPACITY = 1000;
     private final static int WIDTH = 400;
     private final static double TRAVEL_DISTANCE = 5;
@@ -31,22 +30,23 @@ public class MonteCarloLocalization implements Runnable {
     private int direction = 1;
 
 
-    public MonteCarloLocalization(EV3Controller ctr, ParticleListener listener, TreeMap<Double, Double> particleDistanceMap) {
+    public MonteCarloLocalization1D(EV3Controller ctr, ParticleListener listener, TreeMap<Double, Double> particleDistanceMap) {
         this.ctr = ctr;
         this.listener = listener;
         this.particleDistanceMap = particleDistanceMap;
     }
 
     public void start(double y) {
-        final double belief = 1 / (double) MonteCarloLocalization.CAPACITY;
-        particles = IntStream.range(0, CAPACITY).mapToObj(i -> new Particle(WIDTH * Math.random(), y, belief)).collect(Collectors.toList());
+        final double belief = 1 / (double) CAPACITY;
         direction = ctr.getDirection().await();
+        particles = IntStream.range(0, CAPACITY).mapToObj(i -> new Particle(i / (double) CAPACITY * (double) WIDTH, y, (direction - 1) * -90, belief)).collect(Collectors.toList());
         ctr.rotateFrontDistanceSensorMotor(90 - direction * ctr.getSensorPosition().await().intValue());
         ctr.clearScreen();
 
         service.scheduleWithFixedDelay(this, 1, 1, TimeUnit.MILLISECONDS);
     }
 
+    @Override
     public void stop() {
         service.shutdown();
     }
@@ -69,7 +69,7 @@ public class MonteCarloLocalization implements Runnable {
 
                 final double sum = particles.parallelStream()
                         .peek(particle -> {
-                            particle.adjustX(TRAVEL_DISTANCE * direction);
+                            particle.move(TRAVEL_DISTANCE);
 
                             Map.Entry<Double, Double> entry = particleDistanceMap.floorEntry(particle.getX());
                             double particleDist = particle.getY() - (entry == null ? 0 : entry.getValue());
@@ -90,7 +90,7 @@ public class MonteCarloLocalization implements Runnable {
 
                 final double sum2 = particles.parallelStream().mapToDouble(Particle::getBelief).sum();
                 particles.parallelStream().forEach(particle -> particle.adjustBelief(1/sum2));
-                listener.onNewGeneration(particles);
+                listener.redraw(particles);
             });
 
             double[][] clusters = clusterRequest.get();
@@ -102,6 +102,9 @@ public class MonteCarloLocalization implements Runnable {
                     ctr.drawString("AYY", 0, 0);
                 }
             }
+        } else {
+            particles.parallelStream().forEach(particle -> particle.setAngle((direction - 1) * -90));
+            listener.redraw(particles);
         }
     }
 
@@ -151,7 +154,7 @@ public class MonteCarloLocalization implements Runnable {
             double indP = 1.0 / (double) particles.size() * (sp - (2.0 * sp - 2.0) * (double) (pos - 1) / (double)(particles.size() - 1));
             if (Math.random() < indP) {
                 Particle particle = particles.get(pos);
-                newGen.add(new Particle(mutate(particle.getX()), particle.getY(), 1 / (double) CAPACITY));
+                newGen.add(new Particle(mutate(particle.getX()), particle.getY(), particle.getAngle(), 1 / (double) CAPACITY));
                 pos = -1;
             }
             if (pos < particles.size()) {
@@ -164,8 +167,4 @@ public class MonteCarloLocalization implements Runnable {
         particles = newGen;
     }
 
-
-    public interface ParticleListener {
-        void onNewGeneration(List<Particle> particles);
-    }
 }
