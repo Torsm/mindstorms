@@ -15,6 +15,10 @@ import lejos.robotics.SampleProvider;
 import lejos.robotics.filter.MeanFilter;
 import lejos.robotics.navigation.MovePilot;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * EV3ServerController
  */
@@ -22,7 +26,6 @@ public class EV3ServerController implements EV3Controller {
     private final MovePilot movePilot;
     private final NXTRegulatedMotor frontDistanceSensorMotor;
     private final SensorMode frontDistanceSensor;
-    private final SensorMode backDistanceSensor;
     private final SensorMode colorSensor;
     private double surfaceBias = 0.7;
     private int direction = 1;
@@ -33,7 +36,6 @@ public class EV3ServerController implements EV3Controller {
 
         frontDistanceSensorMotor = Motor.C;
         frontDistanceSensor = new EV3UltrasonicSensor(ev3.getPort("S2")).getMode("Distance");
-        backDistanceSensor = new EV3UltrasonicSensor(ev3.getPort("S4")).getMode("Distance");
         colorSensor = new EV3ColorSensor(ev3.getPort("S3")).getRGBMode();
     }
 
@@ -87,14 +89,7 @@ public class EV3ServerController implements EV3Controller {
     }
 
     @Override
-    public ObservableRequest<Float> readBackDistanceSensor() {
-        MeanFilter meanFilter = new MeanFilter(backDistanceSensor, 5);
-        float distance = readSamples(meanFilter)[0];
-        return new ObservableRequest<>(distance);
-    }
-
-    @Override
-    public ObservableRequest<Void> rotateFrontDistanceSensorMotor(int angle) {
+    public ObservableRequest<Void> rotateSensorMotor(int angle) {
         frontDistanceSensorMotor.rotate(angle);
         return new ObservableRequest<>();
     }
@@ -125,6 +120,38 @@ public class EV3ServerController implements EV3Controller {
     @Override
     public ObservableRequest<Integer> getDirection() {
         return new ObservableRequest<>(direction);
+    }
+
+    @Override
+    public ObservableRequest<Integer> getMotorSpeed() {
+        return new ObservableRequest<>(frontDistanceSensorMotor.getSpeed());
+    }
+
+    @Override
+    public ObservableRequest<Void> setMotorSpeed(int speed) {
+        frontDistanceSensorMotor.setSpeed(speed);
+        return new ObservableRequest<>();
+    }
+
+    @Override
+    public ObservableRequest<Void> turnSensorTo(int angle) {
+        frontDistanceSensorMotor.rotate(angle - (int) frontDistanceSensorMotor.getPosition());
+        return new ObservableRequest<>();
+    }
+
+    @Override
+    public ObservableRequest<double[]> read3() {
+        return new ObservableRequest<>(new double[]{readFrontDistanceSensor().await(), readFrontDistanceSensor().await(), readFrontDistanceSensor().await()});
+    }
+
+    @Override
+    public ObservableRequest<float[]> getCurrentAngleData() {
+        MeanFilter meanFilter = new MeanFilter(frontDistanceSensor, 5);
+        float distance = readSamples(meanFilter)[0];
+        float position = frontDistanceSensorMotor.getPosition();
+
+        float[] results = {position, distance};
+        return new ObservableRequest<>(results);
     }
 
     private float[] readSamples(SampleProvider sensor) {

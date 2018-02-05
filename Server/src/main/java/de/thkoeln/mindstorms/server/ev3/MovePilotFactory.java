@@ -16,9 +16,9 @@ public class MovePilotFactory {
         Wheel wheel2 = WheeledChassis.modelWheel(Motor.B, 50).offset(72);
         Chassis chassis = new WheeledChassis(new Wheel[] { wheel1, wheel2 }, WheeledChassis.TYPE_DIFFERENTIAL);
         MovePilot movePilot = new MovePilot(chassis);
-        movePilot.setLinearSpeed(250);
-        movePilot.setLinearAcceleration(250);
-        movePilot.setAngularAcceleration(200);
+        movePilot.setLinearSpeed(150);
+        movePilot.setLinearAcceleration(150);
+        movePilot.setAngularAcceleration(100);
         return movePilot;
     }
 }

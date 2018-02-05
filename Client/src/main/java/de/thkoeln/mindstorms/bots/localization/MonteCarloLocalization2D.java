@@ -1,13 +1,15 @@
 package de.thkoeln.mindstorms.bots.localization;
 
-import de.thkoeln.mindstorms.concurrency.ObservableRequest;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 import lejos.robotics.geometry.Line;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * MonteCarloLocalization2D
@@ -40,9 +42,9 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
             double x = ThreadLocalRandom.current().nextDouble(0, b ? 100 : 150);
             double y = ThreadLocalRandom.current().nextDouble(b ? 150 : 0, b ? 200 : 150);
 
-            double direction = ThreadLocalRandom.current().nextInt(0, 4);
+            double angle = ThreadLocalRandom.current().nextDouble(0, 359);
 
-            return new Particle(x, y, direction * 90, belief);
+            return new Particle(x, y, angle, belief);
         }).collect(Collectors.toList());
 
         listener.redraw(particles);
@@ -64,51 +66,59 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
     }
 
     private void loop() throws InterruptedException {
-        final double sensorData[] = new double[4];
-        ObservableRequest<Float> sensorRequest = ctr.readBackDistanceSensor();
-        sensorData[0] = ctr.readFrontDistanceSensor().await();
-        ctr.rotateFrontDistanceSensorMotor(-90).await();
-        sensorData[1] = ctr.readFrontDistanceSensor().await();
-        ctr.rotateFrontDistanceSensorMotor(180).await();
-        sensorData[2] = ctr.readFrontDistanceSensor().await();
-        ctr.rotateFrontDistanceSensorMotor(-90);
-        sensorData[3] = sensorRequest.get();
-
         particles.forEach(p -> {
-            Line n = null, e = null, s = null, w = null;
-            for (Line line : lines) {
-                if (p.isRelevant(line)) {
-                    if (line.y1 == line.y2) {
-                        if (n == null || n.y1 < line.y1 && line.y1 <= p.getY()) {
-                            n = line;
-                        } else if (s == null || s.y1 > line.y1 && line.y1 >= p.getY()) {
-                            s = line;
-                        }
-                    } else {
-                        if (e == null || e.x1 > line.x1 && line.x1 >= p.getX()) {
-                            e = line;
-                        } else if (w == null || w.x1 < line.x1 && line.x1 <= p.getX()) {
-                            w = line;
+                    Line n = null, e = null, s = null, w = null;
+                    for (Line line : lines) {
+                        if (p.isRelevant(line)) {
+                            if (line.y1 == line.y2) {
+                                if (n == null || n.y1 < line.y1 && line.y1 <= p.getY()) {
+                                    n = line;
+                                } else if (s == null || s.y1 > line.y1 && line.y1 >= p.getY()) {
+                                    s = line;
+                                }
+                            } else {
+                                if (e == null || e.x1 > line.x1 && line.x1 >= p.getX()) {
+                                    e = line;
+                                } else if (w == null || w.x1 < line.x1 && line.x1 <= p.getX()) {
+                                    w = line;
+                                }
+                            }
                         }
                     }
-                }
-            }
+                });
 
-            int direction = (int) p.getAngle() / 90;
+        ctr.setMotorSpeed(360).await();
+        ctr.turnSensorTo(-90).await();
 
-            double directions[] = new double[4];
-            directions[0] = Objects.requireNonNull(e).x1 - p.getX();
-            directions[1] = Objects.requireNonNull(s).y1 - p.getY();
-            directions[2] = p.getX() - Objects.requireNonNull(w).x1;
-            directions[3] = p.getY() - Objects.requireNonNull(n).y1;
+        ctr.setMotorSpeed(25).await();
+        final AtomicBoolean rotating = new AtomicBoolean(true);
+        ctr.turnSensorTo(90).onComplete(result -> rotating.set(false));
 
-            for (int i = 0; i < 4; i++){
-                double partDistance = directions[direction + i % 4];
-                double botDistance = sensorData[i];
+        Stream.Builder<float[]> builder = Stream.builder();
 
-                double factor = Math.min(partDistance, botDistance) / Math.max(partDistance, botDistance);
-                p.adjustBelief(factor);
+        while (rotating.get()) {
+            float[] data = ctr.getCurrentAngleData().await();
+            builder.add(data);
+        }
+
+        builder.build().max(Comparator.comparingDouble(data -> data[1])).ifPresent(data -> {
+            float angle = data[0];
+            ctr.setMotorSpeed(360).await();
+            ctr.turnSensorTo(0);
+            ctr.rotate(angle).await();
+
+            double distance = Arrays.stream(ctr.read3().await()).min().orElse(0);
+            System.out.println(angle + " -> " + distance);
+            if (distance > 0.25 && distance < 1) {
+                ctr.travel(100).await();
+            } else {
+                rotate();
             }
         });
+    }
+
+    private void rotate() {
+        double angle = ThreadLocalRandom.current().nextDouble() * 360 - 180;
+        ctr.rotate(angle).await();
     }
 }

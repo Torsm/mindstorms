@@ -34,11 +34,8 @@ public interface EV3Controller {
     @Opcode(8)
     ObservableRequest<Float> getSensorPosition();
 
-    @Opcode(113)
-    ObservableRequest<Float> readBackDistanceSensor();
-
     @Opcode(9)
-    ObservableRequest<Void> rotateFrontDistanceSensorMotor(int angle);
+    ObservableRequest<Void> rotateSensorMotor(int angle);
 
     @Opcode(10)
     ObservableRequest<Void> setLinearAcceleration(double acceleration);
@@ -51,4 +48,19 @@ public interface EV3Controller {
 
     @Opcode(13)
     ObservableRequest<Integer> getDirection();
+
+    @Opcode(15)
+    ObservableRequest<Integer> getMotorSpeed();
+
+    @Opcode(16)
+    ObservableRequest<Void> setMotorSpeed(int speed);
+
+    @Opcode(17)
+    ObservableRequest<Void> turnSensorTo(int angle);
+
+    @Opcode(97)
+    ObservableRequest<double[]> read3();
+
+    @Opcode(18)
+    ObservableRequest<float[]> getCurrentAngleData();
 }

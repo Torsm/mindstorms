@@ -40,7 +40,7 @@ public class MonteCarloLocalization1D implements Runnable, LocalizationService {
         final double belief = 1 / (double) CAPACITY;
         direction = ctr.getDirection().await();
         particles = IntStream.range(0, CAPACITY).mapToObj(i -> new Particle(i / (double) CAPACITY * (double) WIDTH, y, (direction - 1) * -90, belief)).collect(Collectors.toList());
-        ctr.rotateFrontDistanceSensorMotor(90 - direction * ctr.getSensorPosition().await().intValue());
+        ctr.rotateSensorMotor(90 - direction * ctr.getSensorPosition().await().intValue());
         ctr.clearScreen();
 
         service.scheduleWithFixedDelay(this, 1, 1, TimeUnit.MILLISECONDS);
@@ -126,7 +126,7 @@ public class MonteCarloLocalization1D implements Runnable, LocalizationService {
                     b = false;
                     final CountDownLatch latch = new CountDownLatch(2);
                     ctr.setDirection(direction *= -1);
-                    ctr.rotateFrontDistanceSensorMotor(180 * direction).onComplete(result -> latch.countDown());
+                    ctr.rotateSensorMotor(180 * direction).onComplete(result -> latch.countDown());
                     ctr.travel(30).await();
                     ctr.rotate(87).await();
                     ctr.travel(50).onComplete(result -> latch.countDown());
