@@ -3,6 +3,8 @@ package de.thkoeln.mindstorms.client.environment.dummy;
 import de.thkoeln.mindstorms.concurrency.ObservableRequest;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * EV3DummyController
  */
@@ -10,7 +12,17 @@ public class EV3DummyController implements EV3Controller {
     private final DummyBot bot;
 
     public EV3DummyController() {
-        bot = new DummyBot(0, 0, 0);
+        boolean b = ThreadLocalRandom.current().nextDouble() < 2.0 / 11.0;
+
+        float x = (float) ThreadLocalRandom.current().nextDouble(0, b ? 100 : 150);
+        float y = (float) ThreadLocalRandom.current().nextDouble(b ? 150 : 0, b ? 200 : 150);
+
+        double angle = ThreadLocalRandom.current().nextDouble(0, 360);
+        bot = new DummyBot(x, y, angle);
+    }
+
+    public DummyBot getBot() {
+        return bot;
     }
 
     @Override
@@ -53,7 +65,7 @@ public class EV3DummyController implements EV3Controller {
 
     @Override
     public ObservableRequest<Float> readFrontDistanceSensor() {
-        return null;
+        return new ObservableRequest<>((float) (bot.measureDistance(null) / 1000.0)); // m
     }
 
     @Override
@@ -100,7 +112,7 @@ public class EV3DummyController implements EV3Controller {
 
     @Override
     public ObservableRequest<Void> turnSensorTo(int angle) {
-        rotate(angle - bot.getSensorPosition());
+        rotateSensorMotor(angle - (int) bot.getSensorPosition());
         return new ObservableRequest<>();
     }
 

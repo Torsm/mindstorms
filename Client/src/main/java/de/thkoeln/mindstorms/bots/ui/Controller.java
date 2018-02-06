@@ -3,8 +3,10 @@ package de.thkoeln.mindstorms.bots.ui;
 import de.thkoeln.mindstorms.bots.UserControlledBot;
 import de.thkoeln.mindstorms.bots.localization.*;
 import de.thkoeln.mindstorms.client.MindstormsClient;
+import de.thkoeln.mindstorms.client.environment.dummy.EV3DummyController;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 import javafx.application.Platform;
+import javafx.fxml.Initializable;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
@@ -13,8 +15,13 @@ import lejos.robotics.mapping.SVGMapLoader;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static de.thkoeln.mindstorms.bots.localization.MonteCarloLocalization2D.loopCount;
+import static de.thkoeln.mindstorms.bots.localization.MonteCarloLocalization2D.solveCount;
+import static de.thkoeln.mindstorms.bots.localization.MonteCarloLocalization2D.stepCount;
 
 /**
  * Controller
@@ -39,7 +46,8 @@ public class Controller implements ParticleListener {
     }
 
     public void runTwo() {
-        loadMap("/image/street.svg");
+        lines = loadMap("/image/street.svg");
+        drawMap();
         TreeMap<Double, Double> map = new TreeMap<>(lines.stream().filter(line -> line.y1 == line.y2 && line.y1 != 70).collect(Collectors.toMap(Line::getX1, Line::getY1)));
 
         if (service != null)
@@ -51,8 +59,8 @@ public class Controller implements ParticleListener {
     }
 
     public void runThree() {
-        loadMap("/image/room.svg");
-
+        lines = loadMap("/image/room.svg");
+        drawMap();
 
         if (service != null)
             service.stop();
@@ -62,19 +70,33 @@ public class Controller implements ParticleListener {
         monteCarloLocalization2D.start();
     }
 
-    private void loadMap(String resource) {
+    public static List<Line> loadMap(String resource) {
         try {
             InputStream stream = MindstormsClient.class.getResourceAsStream(resource);
-            lines = Arrays.asList(new SVGMapLoader(stream).readLineMap().flip().getLines());
-
-            drawMap();
+            return Arrays.asList(new SVGMapLoader(stream).readLineMap().flip().getLines());
         } catch (XMLStreamException e) {
             e.printStackTrace();
+            return null;
         }
     }
 
     public void setController(int id) {
         ctr = UserControlledBot.getController(id);
+
+        if (ctr instanceof EV3DummyController)  {
+            new Thread(() -> {
+                while (true) {
+                    runThree();
+                    service.awaitTermination();
+
+                    if (solveCount > 0) {
+                        System.out.println("Times located: " + solveCount);
+                        System.out.println("Average loops: " + loopCount / solveCount);
+                        System.out.println("Average steps: " + stepCount / solveCount);
+                    }
+                }
+            }).start();
+        }
     }
 
     @Override
@@ -83,6 +105,9 @@ public class Controller implements ParticleListener {
             drawMap();
             final GraphicsContext graphics = canvas.getGraphicsContext2D();
             particles.forEach(particle -> particle.draw(graphics));
+            if (ctr instanceof EV3DummyController) {
+                ((EV3DummyController) ctr).getBot().draw(graphics);
+            }
         });
     }
 }

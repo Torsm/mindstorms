@@ -52,6 +52,15 @@ public class MonteCarloLocalization1D implements Runnable, LocalizationService {
     }
 
     @Override
+    public void awaitTermination() {
+        try {
+            service.awaitTermination(1, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
     public void run() {
         try {
             loop();
@@ -103,7 +112,7 @@ public class MonteCarloLocalization1D implements Runnable, LocalizationService {
                 }
             }
         } else {
-            particles.parallelStream().forEach(particle -> particle.setAngle((direction - 1) * -90));
+            particles.parallelStream().forEach(particle -> particle.rotate(180));
             listener.redraw(particles);
         }
     }

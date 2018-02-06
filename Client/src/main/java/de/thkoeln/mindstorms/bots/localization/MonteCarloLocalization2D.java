@@ -3,6 +3,9 @@ package de.thkoeln.mindstorms.bots.localization;
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 import lejos.robotics.geometry.Line;
 import lejos.robotics.geometry.Point;
+import org.apache.commons.math3.ml.clustering.Cluster;
+import org.apache.commons.math3.ml.clustering.DBSCANClusterer;
+import org.apache.commons.math3.ml.clustering.DoublePoint;
 
 import java.util.*;
 import java.util.List;
@@ -20,6 +23,8 @@ import static de.thkoeln.mindstorms.bots.localization.MonteCarloLocalization1D.m
 public class MonteCarloLocalization2D implements Runnable, LocalizationService {
     private final static int CAPACITY = 3000;
     private final static double TRAVEL_DISTANCE = 10;
+
+    public static int loopCount, stepCount, solveCount;
 
     private final EV3Controller ctr;
     private final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
@@ -59,6 +64,15 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
     }
 
     @Override
+    public void awaitTermination() {
+        try {
+            service.awaitTermination(1, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
     public void run() {
         try {
             loop();
@@ -68,51 +82,49 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
     }
 
     private void loop() throws InterruptedException {
-        ctr.turnSensorTo(-90).await();
-        final List<float[]> list = new ArrayList<>();
+        loopCount++;
+        Stream.Builder<float[]> builder = Stream.builder();
+        ctr.turnSensorTo(0).await();
+        builder.add(ctr.getCurrentAngleData().await());
+        ctr.turnSensorTo(-15).await();
+        builder.add(ctr.getCurrentAngleData().await());
+        ctr.turnSensorTo(15).await();
+        builder.add(ctr.getCurrentAngleData().await());
 
-        int count = 10;
-        int step = 180 / count;
-        for (int i = 0; i < count; i++) {
-            list.add(ctr.getCurrentAngleData().await());
-            ctr.rotateSensorMotor(step).await();
-        }
-        list.add(ctr.getCurrentAngleData().await());
-
-        list.stream().min(Comparator.comparingDouble(data -> data[1])).ifPresent(data -> {
+        builder.build().max(Comparator.comparingDouble(data -> data[1])).ifPresent(data -> {
             float angle = data[0];
             ctr.turnSensorTo(0);
             ctr.rotate(angle).await();
 
             double distance = Arrays.stream(ctr.read3().await()).min().orElse(0) * 1000;
-            System.out.println(angle + " -> " + distance);
 
             particles.forEach(particle -> {
                 particle.rotate(angle);
 
-                Point target = new Point((float) (particle.getX() + Math.cos(Math.toRadians(angle)) * 250.0), (float) (particle.getY() + Math.sin(Math.toRadians(angle)) * 250.0));
-                final Line viewport = new Line((float) particle.getX(), (float) particle.getY(), target.x, target.y);
-                lines.stream()
-                        .map(line -> line.intersectsAt(viewport))
-                        .filter(Objects::nonNull)
-                        .mapToDouble(collision -> new Line((float) particle.getX(), (float) particle.getY(), collision.x, collision.y).length() * 10)
-                        .min()
-                        .ifPresent(particleDistance -> {
-                            double val = Math.min(distance, particleDistance) / Math.max(distance, particleDistance);
-                            particle.adjustBelief(val);
-                        });
+                double particleDistance = particle.measureDistance(lines);
+                double val = Math.min(distance, particleDistance) / Math.max(distance, particleDistance);
+                particle.adjustBelief(val);
             });
 
-            if (distance > 250 && distance < 1000) {
+            if (distance > 250) {
                 ctr.travel(TRAVEL_DISTANCE * 10).await();
+                stepCount++;
                 particles.forEach(p -> p.move(TRAVEL_DISTANCE));
+                rotate(30);
             } else {
-                rotate();
+                rotate(180);
             }
 
             resample();
-
             listener.redraw(particles);
+
+            DBSCANClusterer<DoublePoint> clusterer = new DBSCANClusterer<>(15, (int) (CAPACITY * 0.95));
+            List<DoublePoint> points = particles.stream().map(particle -> new DoublePoint(new double[]{particle.getX(), particle.getY()})).collect(Collectors.toList());
+            List<Cluster<DoublePoint>> cluster = clusterer.cluster(points);
+            if (cluster.size() == 1) {
+                stop();
+                solveCount++;
+            }
         });
     }
 
@@ -120,8 +132,21 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
         ArrayList<Particle> newGen = new ArrayList<>(CAPACITY);
         particles.removeIf(p -> p.getX() < 0 || p.getY() < 0 || p.getX() > 150 || p.getY() > 200 || (p.getX() > 100 && p.getY() > 150));
         particles.sort(Comparator.comparingDouble(Particle::getBelief).reversed());
+        double avg = particles.stream().mapToDouble(Particle::getBelief).average().orElse(0);
+        particles.removeIf(particle -> particle.getBelief() < avg * 0.7);
+        while(particles.size() < CAPACITY){
+            boolean b = ThreadLocalRandom.current().nextDouble() < 2.0 / 11.0;
+
+            float x = (float) ThreadLocalRandom.current().nextDouble(0, b ? 100 : 150);
+            float y = (float) ThreadLocalRandom.current().nextDouble(b ? 150 : 0, b ? 200 : 150);
+
+            double angle = ThreadLocalRandom.current().nextDouble(0, 360);
+
+            particles.add(new Particle(x, y, angle, 1 / (double) CAPACITY));
+        }
+
         int pos = 0;
-        double sp = 2;
+        double sp = 1.4;
         while (newGen.size() < CAPACITY) {
             double indP = 1.0 / (double) particles.size() * (sp - (2.0 * sp - 2.0) * (double) (pos - 1) / (double)(particles.size() - 1));
             if (ThreadLocalRandom.current().nextDouble() < indP) {
@@ -129,7 +154,7 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
                 newGen.add(mutate(p));
                 pos = -1;
             }
-            if (pos < particles.size()) {
+            if (pos < particles.size()-1) {
                 pos++;
             } else {
                 pos = 0;
@@ -143,8 +168,8 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
         return new Particle(mutateValue(p.getX(), 0.1, 5), mutateValue(p.getY(), 0.1, 5), (mutateValue(p.getAngle(), 0.1, 5) + 360) % 360, 1 / (double) CAPACITY);
     }
 
-    private void rotate() {
-        final double angle = ThreadLocalRandom.current().nextDouble() * 360 - 180;
+    private void rotate(int deg) {
+        final double angle = ThreadLocalRandom.current().nextDouble() * deg * 2 - deg;
         ctr.rotate(angle).await();
         particles.forEach(particle -> particle.rotate(angle));
     }

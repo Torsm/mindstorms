@@ -5,4 +5,5 @@ package de.thkoeln.mindstorms.bots.localization;
  */
 public interface LocalizationService {
     void stop();
+    void awaitTermination();
 }

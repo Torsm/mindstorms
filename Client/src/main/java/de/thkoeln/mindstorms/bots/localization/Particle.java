@@ -4,6 +4,10 @@ import de.thkoeln.mindstorms.bots.ui.Controller;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import lejos.robotics.geometry.Line;
+import lejos.robotics.geometry.Point;
+
+import java.util.List;
+import java.util.Objects;
 
 import static de.thkoeln.mindstorms.bots.ui.Controller.SCALE;
 
@@ -20,10 +24,6 @@ public class Particle {
         this.belief = belief;
     }
 
-    public double getX() {
-        return x;
-    }
-
     public synchronized void move(double distance) {
         x += Math.cos(Math.toRadians(angle)) * distance;
         y += Math.sin(Math.toRadians(angle)) * distance;
@@ -32,6 +32,10 @@ public class Particle {
     public synchronized void rotate(double degree) {
         angle += degree;
         angle %= 360;
+    }
+
+    public double getX() {
+        return x;
     }
 
     public double getY() {
@@ -46,23 +50,19 @@ public class Particle {
         belief *= factor;
     }
 
-    public void setBelief(double belief) {
-        this.belief = belief;
-    }
-
     public double getAngle() {
         return angle;
     }
 
-    public void setAngle(double angle) {
-        this.angle = angle;
-    }
-
-    public boolean isRelevant(Line line) {
-        return line.y1 == line.y2 ? isBetween(line.x1, line.x2, x) : isBetween(line.y1, line.y2, y);
-    }
-    private boolean isBetween(double a, double b, double c) {
-        return b > a ? c >= a && c <= b : c >= b && c <= a;
+    public double measureDistance(List<Line> walls) {
+        Point target = new Point((float) (x + Math.cos(Math.toRadians(angle)) * 250.0), (float) (y + Math.sin(Math.toRadians(angle)) * 250.0));
+        final Line viewport = new Line((float) x, (float) y, target.x, target.y);
+        return walls.stream()
+                .map(line -> line.intersectsAt(viewport))
+                .filter(Objects::nonNull)
+                .mapToDouble(collision -> new Line((float) x, (float) y, collision.x, collision.y).length() * 10)
+                .map(dist -> dist + 60)
+                .min().orElse(0);
     }
 
     public void draw(GraphicsContext g) {
