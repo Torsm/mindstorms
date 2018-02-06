@@ -13,9 +13,6 @@ import java.util.stream.IntStream;
 /**
  * MonteCarloLocalization1D
  */
-
-
-//TODO Partikel müssen zufällig eine richtung haben, vorne oder hinten da der bot später auch zufällig zu einer seite guckt (?)
 public class MonteCarloLocalization1D implements Runnable, LocalizationService {
     private final static int CAPACITY = 1000;
     private final static int WIDTH = 400;
