@@ -108,11 +108,10 @@ public class MonteCarloLocalization1D implements Runnable, LocalizationService {
         }
     }
 
-    private double mutate(double val) {
-        if (ThreadLocalRandom.current().nextDouble() > 0.1)
+    public static double mutateValue(double val, double chance, double deviation) {
+        if (ThreadLocalRandom.current().nextDouble() > chance)
             return val;
-        double mutation = 5;
-        return ThreadLocalRandom.current().nextDouble(val - mutation, val + mutation);
+        return ThreadLocalRandom.current().nextDouble(val - deviation, val + deviation);
     }
 
     private boolean correct() {
@@ -154,7 +153,7 @@ public class MonteCarloLocalization1D implements Runnable, LocalizationService {
             double indP = 1.0 / (double) particles.size() * (sp - (2.0 * sp - 2.0) * (double) (pos - 1) / (double)(particles.size() - 1));
             if (Math.random() < indP) {
                 Particle particle = particles.get(pos);
-                newGen.add(new Particle(mutate(particle.getX()), particle.getY(), particle.getAngle(), 1 / (double) CAPACITY));
+                newGen.add(new Particle(mutateValue(particle.getX(), 0.1, 5), particle.getY(), particle.getAngle(), 1 / (double) CAPACITY));
                 pos = -1;
             }
             if (pos < particles.size()) {

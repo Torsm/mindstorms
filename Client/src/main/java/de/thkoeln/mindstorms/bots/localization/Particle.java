@@ -24,9 +24,14 @@ public class Particle {
         return x;
     }
 
-    public void move(double distance) {
+    public synchronized void move(double distance) {
         x += Math.cos(Math.toRadians(angle)) * distance;
         y += Math.sin(Math.toRadians(angle)) * distance;
+    }
+
+    public synchronized void rotate(double degree) {
+        angle += degree;
+        angle %= 360;
     }
 
     public double getY() {
@@ -56,7 +61,6 @@ public class Particle {
     public boolean isRelevant(Line line) {
         return line.y1 == line.y2 ? isBetween(line.x1, line.x2, x) : isBetween(line.y1, line.y2, y);
     }
-
     private boolean isBetween(double a, double b, double c) {
         return b > a ? c >= a && c <= b : c >= b && c <= a;
     }

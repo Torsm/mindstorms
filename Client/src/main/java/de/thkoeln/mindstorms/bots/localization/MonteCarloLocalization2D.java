@@ -2,21 +2,24 @@ package de.thkoeln.mindstorms.bots.localization;
 
 import de.thkoeln.mindstorms.server.controlling.EV3Controller;
 import lejos.robotics.geometry.Line;
+import lejos.robotics.geometry.Point;
 
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+
+import static de.thkoeln.mindstorms.bots.localization.MonteCarloLocalization1D.mutateValue;
 
 /**
  * MonteCarloLocalization2D
  */
 public class MonteCarloLocalization2D implements Runnable, LocalizationService {
     private final static int CAPACITY = 3000;
-    private final static double TRAVEL_DISTANCE = 5;
+    private final static double TRAVEL_DISTANCE = 10;
 
     private final EV3Controller ctr;
     private final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
@@ -24,7 +27,6 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
     private final List<Line> lines;
 
     private List<Particle> particles;
-    private int direction = 0;
 
 
     public MonteCarloLocalization2D(EV3Controller ctr, ParticleListener listener, List<Line> lines) {
@@ -35,20 +37,20 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
 
     public void start() {
         final double belief = 1 / (double) CAPACITY;
-        direction = ctr.getDirection().await();
         particles = IntStream.range(0, CAPACITY).mapToObj(i -> {
             boolean b = ThreadLocalRandom.current().nextDouble() < 2.0 / 11.0;
 
-            double x = ThreadLocalRandom.current().nextDouble(0, b ? 100 : 150);
-            double y = ThreadLocalRandom.current().nextDouble(b ? 150 : 0, b ? 200 : 150);
+            float x = (float) ThreadLocalRandom.current().nextDouble(0, b ? 100 : 150);
+            float y = (float) ThreadLocalRandom.current().nextDouble(b ? 150 : 0, b ? 200 : 150);
 
-            double angle = ThreadLocalRandom.current().nextDouble(0, 359);
+            double angle = ThreadLocalRandom.current().nextDouble(0, 360);
 
             return new Particle(x, y, angle, belief);
         }).collect(Collectors.toList());
 
         listener.redraw(particles);
         service.scheduleWithFixedDelay(this, 1, 1, TimeUnit.MILLISECONDS);
+        ctr.setMotorSpeed(100);
     }
 
     @Override
@@ -66,59 +68,84 @@ public class MonteCarloLocalization2D implements Runnable, LocalizationService {
     }
 
     private void loop() throws InterruptedException {
-        particles.forEach(p -> {
-                    Line n = null, e = null, s = null, w = null;
-                    for (Line line : lines) {
-                        if (p.isRelevant(line)) {
-                            if (line.y1 == line.y2) {
-                                if (n == null || n.y1 < line.y1 && line.y1 <= p.getY()) {
-                                    n = line;
-                                } else if (s == null || s.y1 > line.y1 && line.y1 >= p.getY()) {
-                                    s = line;
-                                }
-                            } else {
-                                if (e == null || e.x1 > line.x1 && line.x1 >= p.getX()) {
-                                    e = line;
-                                } else if (w == null || w.x1 < line.x1 && line.x1 <= p.getX()) {
-                                    w = line;
-                                }
-                            }
-                        }
-                    }
-                });
-
-        ctr.setMotorSpeed(360).await();
         ctr.turnSensorTo(-90).await();
+        final List<float[]> list = new ArrayList<>();
 
-        ctr.setMotorSpeed(25).await();
-        final AtomicBoolean rotating = new AtomicBoolean(true);
-        ctr.turnSensorTo(90).onComplete(result -> rotating.set(false));
-
-        Stream.Builder<float[]> builder = Stream.builder();
-
-        while (rotating.get()) {
-            float[] data = ctr.getCurrentAngleData().await();
-            builder.add(data);
+        int count = 10;
+        int step = 180 / count;
+        for (int i = 0; i < count; i++) {
+            list.add(ctr.getCurrentAngleData().await());
+            ctr.rotateSensorMotor(step).await();
         }
+        list.add(ctr.getCurrentAngleData().await());
 
-        builder.build().max(Comparator.comparingDouble(data -> data[1])).ifPresent(data -> {
+        list.stream().min(Comparator.comparingDouble(data -> data[1])).ifPresent(data -> {
             float angle = data[0];
-            ctr.setMotorSpeed(360).await();
             ctr.turnSensorTo(0);
             ctr.rotate(angle).await();
 
-            double distance = Arrays.stream(ctr.read3().await()).min().orElse(0);
+            double distance = Arrays.stream(ctr.read3().await()).min().orElse(0) * 1000;
             System.out.println(angle + " -> " + distance);
-            if (distance > 0.25 && distance < 1) {
-                ctr.travel(100).await();
+
+            particles.forEach(particle -> {
+                particle.rotate(angle);
+
+                Point target = new Point((float) (particle.getX() + Math.cos(Math.toRadians(angle)) * 250.0), (float) (particle.getY() + Math.sin(Math.toRadians(angle)) * 250.0));
+                final Line viewport = new Line((float) particle.getX(), (float) particle.getY(), target.x, target.y);
+                lines.stream()
+                        .map(line -> line.intersectsAt(viewport))
+                        .filter(Objects::nonNull)
+                        .mapToDouble(collision -> new Line((float) particle.getX(), (float) particle.getY(), collision.x, collision.y).length() * 10)
+                        .min()
+                        .ifPresent(particleDistance -> {
+                            double val = Math.min(distance, particleDistance) / Math.max(distance, particleDistance);
+                            particle.adjustBelief(val);
+                        });
+            });
+
+            if (distance > 250 && distance < 1000) {
+                ctr.travel(TRAVEL_DISTANCE * 10).await();
+                particles.forEach(p -> p.move(TRAVEL_DISTANCE));
             } else {
                 rotate();
             }
+
+            resample();
+
+            listener.redraw(particles);
         });
     }
 
+    private void resample() {
+        ArrayList<Particle> newGen = new ArrayList<>(CAPACITY);
+        particles.removeIf(p -> p.getX() < 0 || p.getY() < 0 || p.getX() > 150 || p.getY() > 200 || (p.getX() > 100 && p.getY() > 150));
+        particles.sort(Comparator.comparingDouble(Particle::getBelief).reversed());
+        int pos = 0;
+        double sp = 2;
+        while (newGen.size() < CAPACITY) {
+            double indP = 1.0 / (double) particles.size() * (sp - (2.0 * sp - 2.0) * (double) (pos - 1) / (double)(particles.size() - 1));
+            if (ThreadLocalRandom.current().nextDouble() < indP) {
+                Particle p = particles.get(pos);
+                newGen.add(mutate(p));
+                pos = -1;
+            }
+            if (pos < particles.size()) {
+                pos++;
+            } else {
+                pos = 0;
+            }
+        }
+
+        particles = newGen;
+    }
+
+    private Particle mutate(Particle p) {
+        return new Particle(mutateValue(p.getX(), 0.1, 5), mutateValue(p.getY(), 0.1, 5), (mutateValue(p.getAngle(), 0.1, 5) + 360) % 360, 1 / (double) CAPACITY);
+    }
+
     private void rotate() {
-        double angle = ThreadLocalRandom.current().nextDouble() * 360 - 180;
+        final double angle = ThreadLocalRandom.current().nextDouble() * 360 - 180;
         ctr.rotate(angle).await();
+        particles.forEach(particle -> particle.rotate(angle));
     }
 }

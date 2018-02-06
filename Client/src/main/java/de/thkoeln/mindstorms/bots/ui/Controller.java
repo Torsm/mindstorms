@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * Controller
  */
 public class Controller implements ParticleListener {
-    public static final double SCALE = 1;
+    public static final double SCALE = 3;
     public Canvas canvas;
 
     private EV3Controller ctr;
