@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.stream.Stream;
 
 /**
- * Source of this pile of dirt: http://www.sanfoundry.com/java-program-implement-lloyds-algorithm/
+ * Source of this: http://www.sanfoundry.com/java-program-implement-lloyds-algorithm/
  */
 public class LloydsAlgorithm {
     protected double[][] samplePoints;
@@ -203,41 +203,6 @@ public class LloydsAlgorithm {
     protected void multiplyPointValues(double[] v1, double f) {
         for (int pointIdx = 0; pointIdx < v1.length; pointIdx++) {
             v1[pointIdx] *= f;
-        }
-    }
-
-    public static void main(String[] args) {
-        ArrayList<double[]> points = new ArrayList<>();
-
-        points.add(arrayOf(33, 70, 0));
-        points.add(arrayOf(34, 70, 0));
-        points.add(arrayOf(35, 70, 0));
-        points.add(arrayOf(36, 70, 0));
-        points.add(arrayOf(36, 70, 0));
-        points.add(arrayOf(38, 70, 0));
-        points.add(arrayOf(39, 70, 0));
-        points.add(arrayOf(40, 70, 0));
-        points.add(arrayOf(34, 70, 0));
-        points.add(arrayOf(35, 70, 0));
-        points.add(arrayOf(36, 70, 0));
-        points.add(arrayOf(36, 70, 0));
-        points.add(arrayOf(38, 70, 0));
-        points.add(arrayOf(39, 70, 0));
-        points.add(arrayOf(40, 70, 0));
-        points.add(arrayOf(34, 70, 0));
-        points.add(arrayOf(35, 70, 0));
-        points.add(arrayOf(36, 70, 0));
-        points.add(arrayOf(36, 70, 0));
-        points.add(arrayOf(38, 70, 0));
-        points.add(arrayOf(39, 70, 0));
-        points.add(arrayOf(40, 70, 0));
-
-        LloydsAlgorithm gl = new LloydsAlgorithm(points.toArray(new double[points.size()][2]));
-
-        double[][] results = gl.getClusterPoints(2);
-        for (double[] point : results) {
-            System.out.println("Cluster " + point[0] + ", " + point[1] + ", "
-                    + point[2]);
         }
     }
 
